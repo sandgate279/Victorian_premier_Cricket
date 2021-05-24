@@ -1,0 +1,454 @@
+from selenium import webdriver
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.wait import WebDriverWait
+from bs4 import BeautifulSoup
+import time
+import re
+import string
+import pandas as pd
+#Match->Match URRL
+
+driver = webdriver.Firefox(executable_path =r'C:\Users\sures\Desktop\geckodriver-v0.29.1-win64\geckodriver.exe')
+
+url='http://premier.cricketvictoria.com.au/common/pages/public/rv/match.aspx?redirect=1&'
+driver.get(url)
+def find_teams(driver):
+ #Find the Teams played for the tournament
+        Teams = driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_rvsb_selectorBar_inner"]/div/div[2]/table/tbody/tr/td[2]')
+
+        dt=[]
+        #Assumig max of 10 teams
+        for i in range(1,15):
+            if Teams.text.split('\n',i):     
+                x=i-1
+                try:
+                      
+                      var=Teams.text.split('\n',i)[x]
+                      
+                      dt.append(var)
+                except:
+                     x=1
+        return dt
+def find_grade(driver):
+         #Select the Grade
+    data=[]
+    GG=driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_rvsb_selectorBar_inner"]/div/div[1]/div[3]')
+    
+    for i in range(1,10): #loop for Grade
+        if GG.text.split('\n',i):     
+            x=i-1
+            try:
+                  var=GG.text.split('\n',i)[x]
+                  data.append(var)
+                  #print(data) 
+            except:
+                   x=1
+    
+    data.remove('Grade')
+    return data
+def find_round(driver):
+    #select the Round
+    Round=driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_rvsb_selectorBar_inner"]/div/div[1]/div[2]')
+    #print(Round.text)
+    rd=[]
+     #Assumig max of 20 rounds
+    for i in range(1,20):
+            if Round.text.split('\n',i):     
+                x=i-1
+                try:
+                      var=Round.text.split('\n',i)[x]
+                      rd.append(var)
+                      #print(rd)
+                except:
+                         x=1
+    rd.remove('Round')
+    return rd
+
+    
+
+def batting_data(driver):
+    
+    html=driver.page_source
+    soup=BeautifulSoup(html,'html.parser')
+    pt=2
+
+    #table = soup.find_elements_by_class_name('table', attrs={'class':'innings-table'})
+
+    table=[T for T in soup.find_all(class_='innings-table')]
+    Bowling_table=[T for T in soup.find_all(class_='bowling-table')]
+    
+    
+    for table_index in range(0,len(table)):
+            table_body=table[table_index].find('tbody')  
+            Bowling_table_body=Bowling_table[table_index].find('tbody')
+            data = []
+            rows = table_body.find_all('tr')
+            for row in rows:
+                cols = row.find_all('td')
+                cols = [ele.text.strip() for ele in cols]
+                data.append([ele for ele in cols  ]) # Get rid of empty values
+            #time.sleep(0.5)
+
+            df=pd.DataFrame(data)
+            #print(df) 
+            #find date
+            date=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td')
+            dat=date.text
+            dat=dat.split('(',1)[0]
+            dat=dat.split('-',1)[1]
+            #print(dat)
+            List.append(dat)
+            #match id
+            Mid=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div[6]/div[1]/span')
+            Mid=Mid.text.split(':',1)[1]
+            #print(Mid)
+        #print table index innings
+            if table_index<=1:
+                x=1
+            elif table_index>1:
+                x=2
+      
+            if table_index==0:
+                #venue
+                venue=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div[6]/div[1]/a')
+                List.append(venue.text)
+                #format of the game 
+                form=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/table/tbody/tr[2]/td')
+                count=0
+                for i in form.text:
+                    if i== '(':
+                        count+=1
+                if count==1:
+                    List.append('One day game')
+                else:
+                    List.append('Two day game')
+                    
+                    
+                
+                # who batted first
+                Batted=driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_panelMain"]/div[7]/div[1]/span[2]')
+                sp=Batted.text.split(':',1)[1]
+
+                sp=sp.split(" ",1)[1]
+                #print("Batted first:",sp)
+                #who won the match and batted first or second
+                Defeat=driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_panelMain"]/table/tbody/tr[3]/td[2]')
+                if(Defeat.text=='def'):
+                    Winner=driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_panelMain"]/table/tbody/tr[3]/td[1]/a')
+                    #sp1=select6.text.split("\n",1)[0]
+                    if(sp==Winner.text):
+                        
+                        
+                        List.append(Winner.text)
+                        List.append('Batted first')
+
+                    else:
+                        
+                        List.append(Winner.text)
+                        List.append('Batted Second')
+                else:
+                    Winner=driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_panelMain"]/table/tbody/tr[3]/td[3]/a')
+                    if(sp==Winner.text):
+                        
+                        List.append(Winner.text)
+                        List.append('Batted first')
+                    else:
+                        
+                        List.append(Winner.text)
+                        List.append('Batted Second')
+            if table_index==0:  
+                innings_played=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div[8]/div[2]/div[1]')
+                List.append(innings_played.text)
+            elif table_index==1:
+                innings_played=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div[8]/div[3]/div[1]')
+                List.append(innings_played.text)
+            elif table_index==2:
+                innings_played=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div[8]/div[6]/div[1]')
+                List.append(innings_played.text)
+            elif table_index==3:
+                innings_played=driver.find_element_by_xpath('/html/body/form/div[3]/div[1]/div[1]/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div[8]/div[7]/div[1]')
+                List.append(innings_played.text)
+                #time.sleep(0.5)
+            # find total number of 4's
+
+            ls=df[4].tolist() 
+            ls.remove('4s')
+
+            ls=[i for i in ls if i] #remove empty spaces in the list
+            T=0
+            for i in range(0,len(ls)):
+                T+=int(ls[i])
+            List.append(T)
+            
+            #find totoal number of 6's
+            TT=0
+            l=df[5].tolist()
+            l.remove('6s')
+
+            l=[i for i in l if i]
+            for i in range(0,len(l)):
+                TT+=int(l[i])
+            List.append(TT)
+            
+
+
+            #Overs
+            
+            overs=df[df[0].str.match('Overs')]
+            overs=str(overs)
+            overs=overs.split('Overs',1)[1]
+            List.append(overs)
+            
+           #find extras
+            tem=[]
+            tem=df[df[0].str.match('Extras')] #find extras in data frame
+            tem1=str(tem)
+            #get last digit(s)afeter ... in data frame
+            List.append(tem1.split('...',1)[1])
+            #find score
+        
+            tem=(str(df[df[0].str.match('Total')]))
+            tem1=[]
+           
+            tem2=tem.split('Total',1)#split on Total
+           
+            try:
+                
+                    tem2=str(tem2).split('/',)[1] #if 6/120 exists
+                    tem2=str(tem2).split('\\n',1)[0] #split on \\n
+                    tem2=str(tem2).split('\\',1)[0]#split on \
+                    List.append(tem2)
+            except:
+                    List.append(tem2[1])#120
+                
+           
+      
+           # time.sleep(0.5)
+     
+  #maiden  overs
+            data = []
+            df=[]
+            rows =  Bowling_table_body.find_all('tr')
+            for row in rows:
+                cols = row.find_all('td')
+                cols = [ele.text.strip() for ele in cols]
+                data.append([ele for ele in cols  ]) # Get rid of empty values
+                df=pd.DataFrame(data)
+            l=df[2].tolist()
+            l.remove('M')
+            TT=0
+            l=[i for i in l if i]
+            for i in range(0,len(l)):
+                    TT+=int(l[i])
+            
+            List.append(TT)
+  #---------------------------------------------------------------------------------#Program execution starts here-----------------------------
+List=[]
+Season = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_0$lc'))
+Season.select_by_visible_text('2019/2020')
+
+
+
+for rnd in range(0,len(find_round(driver))): #for loop for Round-strart with 1 becoz 0 is Round text
+  
+    Season = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_0$lc'))
+    Season.select_by_visible_text('2019/2020')
+    
+    Round = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_1$lc'))
+    Round.select_by_index(rnd)
+
+
+
+    
+ 
+
+   
+    for Gr in range(0,len(find_grade(driver))-1): #loop for Grade
+        
+        Season = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_0$lc'))
+        Season.select_by_visible_text('2019/2020')
+
+      
+       # time.sleep(0.5)
+        #select the Round
+        Round = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_1$lc'))
+        Round.select_by_index(rnd)
+
+        Grade = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_3$lc'))
+        Grade.select_by_index(Gr)
+
+
+       
+        driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$ctl09').click()
+
+       
+        try:
+            for index in range(0,len(find_teams(driver))): #for loop for Teams
+                  
+                    #Match->Match URRL
+                    List=[]
+
+
+                    Season = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_0$lc'))
+                    Season.select_by_visible_text('2019/2020')
+                    List.append('2019/2020')
+
+
+                    #time.sleep(0.5)                                                 
+                    Round = Select(driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_rvsb_rvsbc_3_lc"]'))
+                    Round.select_by_index(rnd)
+
+
+                    Grade = Select(driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$rvsbc_3$lc'))
+                    Grade.select_by_index(Gr)
+
+                    driver.find_element_by_name('ctl00$MainPlaceHolder2$RVPageTemplateControl$rvsb$ctl09').click()
+                    rd=find_round(driver)
+
+                    List.append(rd[rnd])
+                    data=find_grade(driver)
+                    List.append(data[Gr])
+                    dt=find_teams(driver)
+                    time.sleep(0.5)
+                    dropdown = Select(driver.find_element_by_xpath('//*[@id="ctl00_MainPlaceHolder2_RVPageTemplateControl_rvsb_selectorBar_inner"]/div/div[2]/table/tbody/tr/td[2]/select'))
+                    time.sleep(0.5)
+                    List.append(dt[index])
+                    dropdown.select_by_index(index)
+
+                    #time.sleep(0.5)
+
+                    batting_data(driver)
+                    print("#####################################################################")
+                    time.sleep(0.5)
+                    print('Season ','Grade','Round','Teams Played','Total 4S','Total 6s','Extras','Score','Overs','Total Maidens','Venue','Winning Team','Winner Batted','Total 4s','Total 6s','Extras','Score','Overs','Maaidens')
+                    print(List)
+                    time.sleep(0.5)
+                    # using list comprehension + zip() + slicing + enumerate() 
+                    # Split list into lists by particular value 
+                    size = len(List) 
+                    idx_list = [idx + 1 for idx, val in
+                    enumerate(List) ] 
+
+
+                    res = [List[i: j] for i, j in
+                    zip([0] + idx_list, idx_list + 
+                    ([size] if idx_list[-1] != size else []))] 
+              # print result 
+                    #print("The list after splitting by a value : " + str(res)) 
+                    #res=str(res)
+                    
+                    time.sleep(1)
+                    import csv
+                    csvfile=open(r"C:\Users\sures\Desktop\2018-19.csv",'w',newline='\n')
+                    try:
+                        out = csv.writer(csvfile)
+                        out.writerow(map(lambda x: x, List))
+
+                    finally:
+                          csvfile.close()
+                        #print(data_frame)
+                    print('-----------------------------------------------')
+                    time.sleep(1)
+
+    #                 driver1 = webdriver.Firefox()
+    #                 driver1.get(url)
+    #                 driver=driver1
+
+                    List=[]
+        except:
+                x=1
+
+
+
+
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '  CURR', "Kookaburra Women's Premier Firsts T20", 'Box Hill v Ringwood', ' Sun 6 Oct 2019 ', 'Schramms Reserve #1', 'One day game', 'Box Hill', 'Batted first', '1ST INNINGS - BOX HILL', 6, 0, '  20.0        ', '  16        ', '99', 1, ' Sun 6 Oct 2019 ', '1ST INNINGS - RINGWOOD', 3, 0, '  20.0        ', '  6        ', '  61        ', 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '  CURR', "Kookaburra Women's Premier Firsts T20", 'Carlton-Brunswick v Prahran', ' Sun 6 Oct 2019 ', 'Princes Park #1', 'One day game', 'Prahran', 'Batted first', '1ST INNINGS - PRAHRAN', 23, 2, '  20.0        ', '  6        ', '181', 0, ' Sun 6 Oct 2019 ', '1ST INNINGS - CARLTON-BRUNSWICK', 14, 0, '  20.0        ', '  22        ', '135', 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '  CURR', "Kookaburra Women's Premier Firsts T20", 'Dandenong v Plenty Valley', ' Sun 6 Oct 2019 ', 'Shepley Oval', 'One day game', 'Plenty Valley', 'Batted first', '1ST INNINGS - PLENTY VALLEY', 9, 2, '  20.0        ', '  10        ', '118', 0, ' Sun 6 Oct 2019 ', '1ST INNINGS - DANDENONG', 8, 1, '  20.0        ', '  5        ', "101        ']", 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "  Kookaburra Women's Premier Firsts One Day", 'Prahran v Plenty Valley']
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "  Kookaburra Women's Premier Firsts One Day", 'Box Hill v Carlton-Brunswick', ' Sun 10 Nov 2019 ', 'Box Hill City Oval', 'One day game', 'Box Hill', 'Batted Second', '1ST INNINGS - CARLTON-BRUNSWICK', 6, 0, '  24.3        ', '  16        ', '  64        ', 7, ' Sun 10 Nov 2019 ', '1ST INNINGS - BOX HILL', 8, 0, '  13.1        ', '  9        ', "65        ']", 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "  Kookaburra Women's Premier Firsts One Day", 'Melbourne v Essendon Maribyrnong Park', ' Sun 10 Nov 2019 ', 'Beaumaris Secondary College - North Oval', 'One day game', 'Essendon Maribyrnong Park', 'Batted Second', '1ST INNINGS - MELBOURNE', 9, 0, '  42.0        ', '  12        ', '  103        ', 9, ' Sun 10 Nov 2019 ', '1ST INNINGS - ESSENDON MARIBYRNONG PARK', 12, 0, '  15.4        ', '  18        ', "104        ']", 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "  Kookaburra Women's Premier Firsts One Day", 'Dandenong v Ringwood', ' Sun 10 Nov 2019 ', 'Wilson Oval', 'One day game', 'Ringwood', 'Batted first', '1ST INNINGS - RINGWOOD', 10, 0, '  35.3        ', '  20        ', '  128        ', 3, ' Sun 10 Nov 2019 ', '1ST INNINGS - DANDENONG', 4, 0, '  32.3        ', '  18        ', '  114        ', 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Women's Premier Seconds One Day", 'Plenty Valley v Prahran', ' Sun 10 Nov 2019 ', 'AK Line Reserve', 'One day game', 'Prahran', 'Batted first', '1ST INNINGS - PRAHRAN', 13, 0, '  37.0        ', '  53        ', '  164        ', 2, ' Sun 10 Nov 2019 ', '1ST INNINGS - PLENTY VALLEY', 15, 0, '  31.2        ', '  31        ', '  159        ', 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Women's Premier Seconds One Day", 'Carlton-Brunswick v Box Hill', ' Sun 10 Nov 2019 ', 'AG Gillon Oval', 'One day game', 'Box Hill', 'Batted first', '1ST INNINGS - BOX HILL', 6, 0, '  45.0        ', '  26        ', '176', 1, ' Sun 10 Nov 2019 ', '1ST INNINGS - CARLTON-BRUNSWICK', 7, 1, '  42.5        ', '  19        ', '  175        ', 4]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Women's Premier Seconds One Day", 'Essendon Maribyrnong Park v Melbourne', ' Sun 10 Nov 2019 ', 'Aberfeldie Park', 'One day game', 'Essendon Maribyrnong Park', 'Batted Second', '1ST INNINGS - MELBOURNE', 15, 0, '  41.3        ', '  49        ', '  175        ', 3, ' Sun 10 Nov 2019 ', '1ST INNINGS - ESSENDON MARIBYRNONG PARK', 12, 2, '  43.0        ', '  63        ', "181        ']", 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Women's Premier Seconds One Day", 'Ringwood v Dandenong']
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Geelong v Camberwell Magpies', ' Sat 5 Oct 2019 ', 'Geelong Cricket Ground', 'One day game', 'Camberwell Magpies', 'Batted Second', '1ST INNINGS - GEELONG', 22, 3, '  50.0        ', '  17        ', '255', 2, ' Sat 5 Oct 2019 ', '1ST INNINGS - CAMBERWELL MAGPIES', 21, 3, '  49.5        ', '  17        ', '256', 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Carlton v Essendon', ' Sat 5 Oct 2019 ', 'Princes Park #1', 'One day game', 'Essendon', 'Batted Second', '1ST INNINGS - CARLTON', 10, 0, '  24.2        ', '  7        ', '  75        ', 6, ' Sat 5 Oct 2019 ', '1ST INNINGS - ESSENDON', 7, 3, '  10.1        ', '  21        ', '79', 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Casey-South Melbourne v Prahran', ' Sat 5 Oct 2019 ', 'Casey Fields No. 4', 'One day game', 'Prahran', 'Batted Second', '1ST INNINGS - CASEY-SOUTH MELBOURNE', 2, 0, '  31.1        ', '  5        ', '  45        ', 8, ' Sat 5 Oct 2019 ', '1ST INNINGS - PRAHRAN', 3, 1, '  15.1        ', '  3        ', "46        ']", 3]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Dandenong v Melbourne University', ' Sat 5 Oct 2019 ', 'Shepley Oval', 'One day game', 'Melbourne University', 'Batted Second', '1ST INNINGS - DANDENONG', 8, 1, '  50.0        ', '  21        ', '163', 6, ' Sat 5 Oct 2019 ', '1ST INNINGS - MELBOURNE UNIVERSITY', 12, 2, '  47.5        ', '  23        ', '164', 5]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Monash Tigers v Fitzroy Doncaster', ' Sat 5 Oct 2019 ', 'Central Reserve North', 'One day game', 'Fitzroy Doncaster', 'Batted first', '1ST INNINGS - FITZROY DONCASTER', 14, 0, '  49.1        ', '  21        ', '  226        ', 4, ' Sat 5 Oct 2019 ', '1ST INNINGS - MONASH TIGERS', 7, 0, '  42.2        ', '  5        ', '  129        ', 4]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Kingston Hawthorn v Footscray', ' Sat 5 Oct 2019 ', 'Walter Galt Reserve (Main Oval)', 'One day game', 'Footscray', 'Batted Second', '1ST INNINGS - KINGSTON HAWTHORN', 23, 1, '  50.0        ', '  17        ', '223', 1, ' Sat 5 Oct 2019 ', '1ST INNINGS - FOOTSCRAY', 25, 2, '  36.5        ', '  18        ', "225        ']", 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Northcote v Frankston Peninsula', ' Sat 5 Oct 2019 ', 'AH Butler Oval', 'One day game', 'Frankston Peninsula', 'Batted Second', '1ST INNINGS - NORTHCOTE', 14, 2, '  50.0        ', '  29        ', '238', 4, ' Sat 5 Oct 2019 ', '1ST INNINGS - FRANKSTON PENINSULA', 14, 6, '  49.4        ', '  9        ', '240', 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'St Kilda v Greenvale Kangaroos', ' Sat 5 Oct 2019 ', 'CitiPower Centre', 'One day game', 'St Kilda', 'Batted Second', '1ST INNINGS - GREENVALE KANGAROOS', 13, 1, '  50.0        ', '  12        ', '172', 5, ' Sat 5 Oct 2019 ', '1ST INNINGS - ST KILDA', 20, 2, '  33.0        ', '  2        ', "173        ']", 2]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Firsts", 'Melbourne v Ringwood', ' Sat 5 Oct 2019 ', 'Albert Ground', 'One day game', 'Ringwood', 'Batted first', '1ST INNINGS - RINGWOOD', 14, 1, '  50.0        ', '  20        ', '208', 3, ' Sat 5 Oct 2019 ', '1ST INNINGS - MELBOURNE', 11, 3, '  44.5        ', '  8        ', '  158        ', 5]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Seconds", 'Camberwell Magpies v Geelong', ' Sat 5 Oct 2019 ', 'Camberwell Sports Ground', 'One day game', 'Camberwell Magpies', 'Batted first', '1ST INNINGS - CAMBERWELL MAGPIES', 20, 2, '  50.0        ', '  34        ', '253', 0, ' Sat 5 Oct 2019 ', '1ST INNINGS - GEELONG', 16, 3, '  49.1        ', '  17        ', '  225        ', 0]
+-----------------------------------------------
+#####################################################################
+Season  Grade Round Teams Played Total 4S Total 6s Extras Score Overs Total Maidens Venue Winning Team Winner Batted Total 4s Total 6s Extras Score Overs Maaidens
+['2019/2020', '1', "Kookaburra Men's Premier Seconds", 'Essendon v Carlton', ' Sat 5 Oct 2019 ', 'Windy Hill', 'One day game', 'Essendon', 'Batted Second', '1ST INNINGS - CARLTON', 0, 0, '  46.3        ', '  13        ', '  153        ', 6, ' Sat 5 Oct 2019 ', '1ST INNINGS - ESSENDON', 0, 0, '  28.0        ', '  5        ', "157        ']", 0]
+-----------------------------------------------
+
